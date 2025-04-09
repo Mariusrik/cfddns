@@ -10,16 +10,61 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class Records(val result: List<Record>)
+data class CloudflareResponse(
+    val success: Boolean,
+    val result: List<Record>,
+    val errors: List<ErrorMessage>? = null,
+    val messages: List<Message>? = null,
+    val result_info: ResultInfo
+)
+
+@Serializable
+data class ErrorMessage(
+    val code: Int,
+    val message: String,
+    val documentation_url: String?,
+    val source: Source?
+)
+
+@Serializable
+data class Message(
+    val code: Int,
+    val message: String,
+    val documentation_url: String?,
+    val source: Source?
+)
+
+@Serializable
+data class Source(
+    val pointer: String?
+)
+
+@Serializable
+data class ResultInfo(
+    val count: Int,
+    val page: Int,
+    val per_page: Int,
+    val total_count: Int
+)
 
 @Serializable
 data class Record(
     val id: String,
-    val zone_id: String,
-    val zone_name: String,
+    val comment: String? = null,
+    val content: String,
     val name: String,
+    val proxied: Boolean,
+    val settings: Settings,
+    val tags: List<String>,
+    val ttl: Int,
     val type: String,
-    val content: String
+    val proxiable: Boolean
+)
+
+@Serializable
+data class Settings(
+    val ipv4_only: Boolean? = null,
+    val ipv6_only: Boolean? = null
 )
 
 @Serializable
@@ -90,16 +135,17 @@ suspend fun updateRecords(client: HttpClient, location: String, token: String, m
     if (response.status.value in 200..299) {
         println(response.status)
         println("Got DNS for records, jefe")
+        println(response.bodyAsText())
     } else {
         println(response.status)
         println("Error getting DNS record exiting.")
         return
     }
 
-    val records: Records = response.body()
+    val cloudflareResponse: CloudflareResponse = response.body()
     val recordContent = RecordContent(myIp)
 
-    for (record in records.result) {
+    for (record in cloudflareResponse.result) {
         val updateRes = updateRecord(client, location, token, record.id, recordContent)
         if (updateRes.status.value in 200..299) {
             println(updateRes.status)
@@ -127,5 +173,3 @@ suspend fun updateRecord(client: HttpClient, location: String, token: String, id
         setBody(recordContent)
     }
 }
-
-
